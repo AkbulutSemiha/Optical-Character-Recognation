@@ -8,8 +8,8 @@ import scipy
 import glob, os
 import math
 from skimage import measure
-MIN_CONTOUR_AREA = 50
-
+MIN_CONTOUR_AREA = 35
+SPACE_SIZE=8
 RESIZED_IMAGE_WIDTH = 40
 RESIZED_IMAGE_HEIGHT = 50
 
@@ -58,8 +58,8 @@ def readCharacter(readImage):
 
 allContoursWithData = []                # declare empty lists,
 validContoursWithData = []              # we will fill these shortly
-imgTestingCharacters = cv2.imread("C:\\Users\\akbul\\Desktop\\ISSD STAJ\\OCR\\textIng.jpg")          # read in testing numbers image
-freshImage=cv2.imread("C:\\Users\\akbul\\Desktop\\ISSD STAJ\\OCR\\text4.jpg")
+imgTestingCharacters = cv2.imread("C:\\Users\\akbul\\Desktop\\ISSD STAJ\\OCR\\text3.jpg")          # read in testing numbers image
+freshImage=cv2.imread("C:\\Users\\akbul\\Desktop\\ISSD STAJ\\OCR\\text2.jpg")
 imgGray = cv2.cvtColor(imgTestingCharacters, cv2.COLOR_BGR2GRAY)       # get grayscale image
 imgBlurred = cv2.bilateralFilter(imgGray,5,75,75)               # blur
 
@@ -71,13 +71,17 @@ imgThresh = cv2.adaptiveThreshold(imgBlurred,                           # input 
                                       11,                                   # size of a pixel neighborhood used to calculate threshold value
                                       2)                                    # constant subtracted from the mean or weighted mean
 
-med_th = scipy.signal.medfilt2d(imgThresh,5)#Remove Salt and Pepper Noise from Image
+med_th = scipy.signal.medfilt2d(imgThresh,3)#Remove Salt and Pepper Noise from Image
 imgThreshCopy = med_th.copy()        # make a copy of the thresh image, this in necessary b/c findContours modifies the image
 
 imgContours, npaContours, npaHierarchy = cv2.findContours(imgThreshCopy,             # input image, make sure to use a copy since the function will modify this image in the course of finding contours
                                                  cv2.RETR_EXTERNAL,         # retrieve the outermost contours only
                                                  cv2.CHAIN_APPROX_SIMPLE)   # compress horizontal, vertical, and diagonal segments and leave only their end points
-
+plt.imshow(imgThreshCopy),plt.show()
+"""rows={}
+for i in range(len(npaContours)):
+    rows.__setitem__(i)
+"""
 for npaContour in npaContours:                             # for each contour
     contourWithData = ContourWithData()                                             # instantiate a contour with data object
     contourWithData.npaContour = npaContour                                         # assign contour to contour with data
@@ -91,8 +95,68 @@ for contourWithData in allContoursWithData:                 # for all contours
     if contourWithData.checkIfContourIsValid():             # check if valid
         validContoursWithData.append(contourWithData)       # if so, append to valid contour list
 
-validContoursWithData.sort(key = operator.attrgetter("intRectX"))         # sort contours from left to right
- 
+validContoursWithData.sort(key = operator.attrgetter("intRectY"))         # sort contours from left to right
+
+row=[]
+for i in range(len(validContoursWithData)):
+    if i+1 ==len(validContoursWithData)-1:
+        text=""
+        row.sort(key=operator.attrgetter("intRectX"))
+        j=0
+        for contourWithData in row:            # for each contour
+            cv2.rectangle(imgTestingCharacters,                                        # draw rectangle on original testing image
+                      (contourWithData.intRectX, contourWithData.intRectY),     # upper left corner
+                      (contourWithData.intRectX + contourWithData.intRectWidth, contourWithData.intRectY + contourWithData.intRectHeight),      # lower right corner
+                      (0, 0, 255),              # Blue
+                      1)                        # thickness
+            crop_img_contours = med_th[contourWithData.intRectY:contourWithData.intRectY + contourWithData.intRectHeight, contourWithData.intRectX:contourWithData.intRectX + contourWithData.intRectWidth]
+            imgResize=cv2.resize(crop_img_contours,(RESIZED_IMAGE_WIDTH , RESIZED_IMAGE_HEIGHT))
+            char=readCharacter(imgResize)
+            if j==len(row)-1:
+                text=text+char
+                break
+            if row[j+1].intRectX - (row[j].intRectX + row[j].intRectWidth) >SPACE_SIZE:
+                text=text+char+" "
+            else:
+                text=text+char
+            j=j+1
+        print(text)
+        #i=len(row)-1
+        row.clear()
+        break
+
+
+    if validContoursWithData[i+1].intRectY-validContoursWithData[i].intRectY<20:
+        row.append(validContoursWithData[i])
+    else:
+        text=""
+        row.sort(key=operator.attrgetter("intRectX"))
+        j=0
+        for contourWithData in row:            # for each contour
+            cv2.rectangle(imgTestingCharacters,                                        # draw rectangle on original testing image
+                      (contourWithData.intRectX, contourWithData.intRectY),     # upper left corner
+                      (contourWithData.intRectX + contourWithData.intRectWidth, contourWithData.intRectY + contourWithData.intRectHeight),      # lower right corner
+                      (0, 0, 255),              # red
+                      1)                        # thickness
+            crop_img_contours = med_th[contourWithData.intRectY:contourWithData.intRectY + contourWithData.intRectHeight, contourWithData.intRectX:contourWithData.intRectX + contourWithData.intRectWidth]
+            imgResize=cv2.resize(crop_img_contours,(RESIZED_IMAGE_WIDTH , RESIZED_IMAGE_HEIGHT))
+            char=readCharacter(imgResize)
+            if j==len(row)-1:
+                text=text+char
+                break
+            if  row[j+1].intRectX - (row[j].intRectX + row[j].intRectWidth) >SPACE_SIZE:
+                text=text+char+" "
+            else:
+                text=text+char
+            j=j+1
+            
+            #print('Character : ' + char)
+            #plt.imshow(imgTestingCharacters),plt.show()
+        print(text)
+        #i=len(row)-1
+        row.clear()
+    
+"""
 for contourWithData in validContoursWithData:            # for each contour
                                             # draw a green rect around the current char
     cv2.rectangle(imgTestingCharacters,                                        # draw rectangle on original testing image
@@ -104,7 +168,7 @@ for contourWithData in validContoursWithData:            # for each contour
     imgResize=cv2.resize(crop_img_contours,(RESIZED_IMAGE_WIDTH , RESIZED_IMAGE_HEIGHT))
     char=readCharacter(imgResize)
     print('Character : ' + char)
-    plt.imshow(imgTestingCharacters),plt.show()
+    plt.imshow(imgTestingCharacters),plt.show()"""
 cv2.imshow('',imgTestingCharacters)
 cv2.waitKey(0)                                          # wait for user key press
 cv2.destroyAllWindows()             # remove windows from memory
